@@ -1,0 +1,376 @@
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/Downloads/All_Team_manufucture.csv'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+
+import warnings
+
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+import spacy
+import nltk
+import re
+import string
+import pandas as pd
+import numpy as np
+#from stop_word_list import *
+#from clean_text import *
+import gensim
+from gensim import corpora
+import pyLDAvis.gensim
+import matplotlib.pyplot as plt
+import json
+%matplotlib inline
+
+from nltk.tokenize import RegexpTokenizer
+from stop_words import get_stop_words
+from nltk.stem.wordnet import WordNetLemmatizer
+from gensim import corpora, models
+import pandas as pd
+import gensim
+import pyLDAvis.gensim
+
+df = pd.read_csv(r'../input/team-3-data-twitter/Team3_alldata.csv')
+
+df.head()
+
+df.shape
+
+df.columns
+
+reviews = pd.DataFrame(df.Text)
+
+pattern = r'\b[^\d\W]+\b'
+tokenizer = RegexpTokenizer(pattern)
+en_stop = get_stop_words('en')
+lemmatizer = WordNetLemmatizer()
+import sklearn
+from sklearn.feature_extraction.text import CountVectorizer
+vectorizer = CountVectorizer()
+import nltk 
+import string 
+from nltk.corpus import stopwords
+stopwords_json = pd.read_json(r"https://raw.githubusercontent.com/6/stopwords-json/master/dist/en.json" )
+stopwords_json.columns = ["en"]
+x = stopwords.words("english")
+stopwords_json_en = set(stopwords_json['en'])
+stopwords_nltk_en = set(x)
+stoplist_combined = set.union(stopwords_json_en, stopwords_nltk_en)
+import re
+from tqdm import tqdm
+from bs4 import BeautifulSoup
+def decontracted(phrase):
+    # specific
+    phrase = re.sub(r"won't", "will not", phrase)
+    phrase = re.sub(r"can\'t", "can not", phrase)
+
+    # general
+    phrase = re.sub(r"n\'t", " not", phrase)
+    phrase = re.sub(r"\'re", " are", phrase)
+    #phrase = re.sub(r"re", " are", phrase)
+    phrase = re.sub(r"\'s", " is", phrase)
+    #phrase = re.sub(r"\'d", " would", phrase)
+    phrase = re.sub(r"de", " ", phrase)
+    phrase = re.sub(r"\'ll", " will", phrase)
+    phrase = re.sub(r"\'t", " not", phrase)
+    phrase = re.sub(r"\'ve", " have", phrase)
+    phrase = re.sub(r"\'m", " am", phrase)
+    #phrase = re.sub(r'==.*?==+', ' ', phrase)
+    #phrase = re.sub(r'\n', ' ',phrase)
+    return phrase
+
+def cleanup_text(msg):
+    No_Punctuation = [char for char in msg if char not in string.punctuation]
+    sentance = ''.join(No_Punctuation) #joins all the strings
+    sentance = re.sub(r"http\S+", "", sentance)
+    sentance = BeautifulSoup(sentance, 'lxml').get_text()
+    sentance = decontracted(sentance)
+    sentance = re.sub("\S*\d\S*", "", sentance).strip()
+    sentance = re.sub('[^A-Za-z]+', ' ', sentance)
+    #sentance = nltk.word_tokenize(sentance)
+    #sentance = nltk.word_tokenize(sentence)
+    #lemmatized_output = ' '.join([lemmatizer.lemmatize(w) for w in sentance])
+    #return [word.lower() for word in sentance.split() if word.lower() not in stoplist_combined]
+    return sentance
+
+df['Text'] = df['Text'].apply(cleanup_text)
+
+clean_reviews = pd.DataFrame(df.Text)
+
+clean_reviews
+
+text = " ".join(review for review in df.Text)
+print ("There are {} words in the combination of all review.".format(len(text)))
+
+from nltk.corpus import stopwords
+stop = stopwords.words('english')
+df['Text'] = df['Text'].apply(lambda x: ' '.join([word for word in x.split() if word not in (stop)]))
+
+df.Text
+
+text = " ".join(review for review in df.Text)
+print ("There are {} words in the combination of all review.".format(len(text)))
+
+from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
+# Generate a word cloud image
+wordcloud = WordCloud( width= 3000, height = 2000, random_state=1,background_color="white").generate(text)
+
+# Display the generated image:
+# the matplotlib way:
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis("off")
+plt.show()
+
+
+import matplotlib.pyplot as plt
+# Define a function to plot word cloud
+def plot_cloud(wordcloud):
+    # Set figure size
+    plt.figure(figsize=(40, 30))
+    # Display image
+    plt.imshow(wordcloud) 
+    # No axis details
+    plt.axis("off");
+    
+# Import package
+from wordcloud import WordCloud, STOPWORDS
+# Generate word cloud
+wordcloud = WordCloud(width= 3000, height = 2000, random_state=1, background_color='white',  stopwords = STOPWORDS).generate(text)
+# Plot
+plot_cloud(wordcloud)
+
+def generate_ngrams(text, n_gram=1):
+    token = [token for token in text.lower().split(" ") if token != "" if token not in STOPWORDS]
+    ngrams = zip(*[token[i:] for i in range(n_gram)])
+    return [" ".join(ngram) for ngram in ngrams]
+
+def horizontal_bar_chart(df, color):
+    trace = go.Bar(
+        y=df["word"].values[::-1],
+        x=df["wordcount"].values[::-1],
+        showlegend=False,
+        orientation = 'h',
+        marker=dict(
+            color=color,
+        ),
+    )
+    return trace
+
+import plotly.graph_objs as go
+from collections import defaultdict
+freq_dict = defaultdict(int)
+for sent in clean_reviews["Text"]:
+    for word in generate_ngrams(sent):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace0 = horizontal_bar_chart(fd_sorted.head(25), 'red')
+
+from plotly import tools
+from plotly.offline import init_notebook_mode, iplot
+fig = tools.make_subplots(rows=1, cols=1, vertical_spacing=0.04,
+                          subplot_titles=["Frequent words of in tweets"])
+fig.append_trace(trace0, 1, 1)
+fig['layout'].update(height=600, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
+iplot(fig, filename='word-plots')
+
+freq_dict = defaultdict(int)
+for sent in clean_reviews["Text"]:
+    for word in generate_ngrams(sent,2):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace0 = horizontal_bar_chart(fd_sorted.head(25), 'gray')
+
+fig = tools.make_subplots(rows=1, cols=1, vertical_spacing=0.04,horizontal_spacing=0.25,
+                          subplot_titles=["Bigram plots of tweets"
+                                          ])
+fig.append_trace(trace0, 1, 1)
+
+
+fig['layout'].update(height=1000, width=800, paper_bgcolor='rgb(233,233,233)', title="Bigram Plot")
+iplot(fig, filename='word-plots')
+
+
+for sent in clean_reviews["Text"]:
+    for word in generate_ngrams(sent,3):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace0 = horizontal_bar_chart(fd_sorted.head(25), 'blue')
+
+fig = tools.make_subplots(rows=1, cols=1, vertical_spacing=0.04, horizontal_spacing=0.05,
+                          subplot_titles=["Tri-gram plots in tweets", 
+                                          ])
+fig.append_trace(trace0, 1, 1)
+
+fig['layout'].update(height=800, width=700, paper_bgcolor='rgb(233,233,233)', title="Trigram Count Plot")
+iplot(fig, filename='word-plots')
+
+from nltk.corpus import stopwords
+stop = stopwords.words('english')
+df['Text'] = df['Text'].apply(lambda x: ' '.join([word for word in x.split() if word not in (stop)]))
+
+bigram_measures = nltk.collocations.BigramAssocMeasures()
+finder = nltk.collocations.BigramCollocationFinder.from_documents([comment.split() for comment in df.Text])
+# Filter only those that occur at least 50 times
+finder.apply_freq_filter(50)
+bigram_scores = finder.score_ngrams(bigram_measures.pmi)
+
+bigram_pmi = pd.DataFrame(bigram_scores)
+bigram_pmi.columns = ['bigram', 'pmi']
+bigram_pmi.sort_values(by='pmi', axis = 0, ascending = False, inplace = True)
+
+
+def bigram_filter(bigram):
+    tag = nltk.pos_tag(bigram)
+    if tag[0][1] not in ['JJ', 'NN'] and tag[1][1] not in ['NN']:
+        return False
+    if bigram[0] in stop or bigram[1] in stop:
+        return False
+    if 'n' in bigram or 't' in bigram:
+        return False
+    if 'PRON' in bigram:
+        return False
+    return True
+
+filtered_bigram = bigram_pmi[bigram_pmi.apply(lambda bigram:\
+                                              bigram_filter(bigram['bigram'])\
+                                              and bigram.pmi > 5, axis = 1)][:500]
+
+bigrams = [' '.join(x) for x in filtered_bigram.bigram.values if len(x[0]) > 2 or len(x[1]) > 2]
+bigrams[:10]
+
+trigram_measures = nltk.collocations.TrigramAssocMeasures()
+finder = nltk.collocations.TrigramCollocationFinder.from_documents([comment.split() for comment in df.Text])
+# Filter only those that occur at least 50 times
+finder.apply_freq_filter(50)
+trigram_scores = finder.score_ngrams(trigram_measures.pmi)
+
+trigram_pmi = pd.DataFrame(trigram_scores)
+trigram_pmi.columns = ['trigram', 'pmi']
+trigram_pmi.sort_values(by='pmi', axis = 0, ascending = False, inplace = True)
+
+def trigram_filter(trigram):
+    tag = nltk.pos_tag(trigram)
+    if tag[0][1] not in ['JJ', 'NN'] and tag[1][1] not in ['JJ','NN']:
+        return False
+    if trigram[0] in stop or trigram[-1] in stop or trigram[1] in stop:
+        return False
+    if 'n' in trigram or 't' in trigram:
+         return False
+    if 'PRON' in trigram:
+        return False
+    return True 
+
+filtered_trigram = trigram_pmi[trigram_pmi.apply(lambda trigram: \
+                                                 trigram_filter(trigram['trigram'])\
+                                                 and trigram.pmi > 5, axis = 1)][:500]
+
+
+
+trigrams = [' '.join(x) for x in filtered_trigram.trigram.values if len(x[0]) > 2 or len(x[1]) > 2 and len(x[2]) > 2]
+
+
+# examples of trigrams
+trigrams[:10]
+
+def replace_ngram(x):
+    for gram in trigrams:
+        x = x.replace(gram, '_'.join(gram.split()))
+    for gram in bigrams:
+        x = x.replace(gram, '_'.join(gram.split()))
+    return x
+
+reviews_w_ngrams = df.copy()
+reviews_w_ngrams.reviewText = reviews_w_ngrams.Text.map(lambda x: replace_ngram(x))
+reviews_w_ngrams = reviews_w_ngrams.reviewText.map(lambda x: [word for word in x.split()\
+                                                 if word not in stop\
+                                                              and len(word) > 2])
+reviews_w_ngrams.head()
+
+def noun_only(x):
+    pos_comment = nltk.pos_tag(x)
+    filtered = [word[0] for word in pos_comment if word[1] in ['NN']]
+    # to filter both noun and verbs
+    #filtered = [word[0] for word in pos_comment if word[1] in ['NN','VB', 'VBD', 'VBG', 'VBN', 'VBZ']]
+    return filtered
+
+final_reviews = reviews_w_ngrams.map(noun_only)
+
+dictionary = corpora.Dictionary(final_reviews)
+
+doc_term_matrix = [dictionary.doc2bow(doc) for doc in final_reviews]
+
+coherence = []
+for k in range(5,25):
+    print('Round: '+str(k))
+    Lda = gensim.models.ldamodel.LdaModel
+    ldamodel = Lda(doc_term_matrix, num_topics=k, id2word = dictionary, passes=40,\
+                   iterations=200, chunksize = 10000, eval_every = None)
+    
+    cm = gensim.models.coherencemodel.CoherenceModel(model=ldamodel, texts=final_reviews,\
+                                                     dictionary=dictionary, coherence='c_v')
+    coherence.append((k,cm.get_coherence()))
+
+x_val = [x[0] for x in coherence]
+y_val = [x[1] for x in coherence]
+
+plt.plot(x_val,y_val)
+plt.scatter(x_val,y_val)
+plt.title('Number of Topics vs. Coherence')
+plt.xlabel('Number of Topics')
+plt.ylabel('Coherence')
+plt.xticks(x_val)
+plt.show()
+
+
+Lda = gensim.models.ldamodel.LdaModel
+ldamodel = Lda(doc_term_matrix, num_topics=15, id2word = dictionary, passes=40,\
+               iterations=200,  chunksize = 10000, eval_every = None, random_state=0)
+
+Lda2 = gensim.models.ldamodel.LdaModel
+ldamodel2 = Lda2(doc_term_matrix, num_topics=23, id2word = dictionary, passes=40,\
+               iterations=200,  chunksize = 10000, eval_every = None, random_state=0)
+
+ldamodel.show_topics(15, num_words=10, formatted=False)
+
+topic_data =  pyLDAvis.gensim.prepare(ldamodel, doc_term_matrix, dictionary, mds = 'pcoa')
+pyLDAvis.display(topic_data)
+
+all_topics = {}
+num_terms = 10 # Adjust number of words to represent each topic
+lambd = 0.6 # Adjust this accordingly based on tuning above
+for i in range(1,16): #Adjust this to reflect number of topics chosen for final LDA model
+    topic = topic_data.topic_info[topic_data.topic_info.Category == 'Topic'+str(i)].copy()
+    topic['relevance'] = topic['loglift']*(1-lambd)+topic['logprob']*lambd
+    all_topics['Topic '+str(i)] = topic.sort_values(by='relevance', ascending=False).Term[:num_terms].values
+
+pd.DataFrame(all_topics).T
+
+ldamodel2.show_topics(23, num_words=10, formatted=False)
+
+topic_data =  pyLDAvis.gensim.prepare(ldamodel2, doc_term_matrix, dictionary, mds = 'pcoa')
+pyLDAvis.display(topic_data)
+
+all_topics = {}
+num_terms = 10 # Adjust number of words to represent each topic
+lambd = 0.6 # Adjust this accordingly based on tuning above
+for i in range(1,24): #Adjust this to reflect number of topics chosen for final LDA model
+    topic = topic_data.topic_info[topic_data.topic_info.Category == 'Topic'+str(i)].copy()
+    topic['relevance'] = topic['loglift']*(1-lambd)+topic['logprob']*lambd
+    all_topics['Topic '+str(i)] = topic.sort_values(by='relevance', ascending=False).Term[:num_terms].values
+
+pd.DataFrame(all_topics).T
